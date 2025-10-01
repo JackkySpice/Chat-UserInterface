@@ -1,6 +1,14 @@
 # 🚀 Start Here - Gemini Chat Interface
 
-## Quick Start
+## 🌟 One-Click Deploy
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/JackkySpice/Chat-UserInterface)
+
+**Click above to deploy to the cloud in 1 minute!** No setup required.
+
+---
+
+## Quick Start (Local)
 
 ### Option 1: Use the Chat (Recommended)
 Simply open **`index.html`** in your web browser and start chatting!
@@ -23,6 +31,7 @@ Open **`LIVE_TEST.html`** to run interactive API tests
 | File | Purpose | What's Inside |
 |------|---------|---------------|
 | **README.md** | 📖 User Guide | Features, installation, usage instructions |
+| **DEPLOY.md** | 🚀 Deployment Guide | One-click deploy & deployment options |
 | **HOW_IT_WORKS.md** | 🔍 Technical Explanation | Detailed explanation of thinking mode & implementation |
 | **VERIFICATION.md** | ✅ Test Results | All verification tests and results |
 | **TEST_SUMMARY.md** | 📊 Complete Report | Comprehensive testing summary |
