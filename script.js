@@ -1,7 +1,6 @@
 // Gemini API Configuration
 const API_KEY = 'AIzaSyD2Oxjw65jnQ_oDFG8sc6DbrdWghygr6Cg';
 const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${API_KEY}`;
-const STREAM_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=sse&key=${API_KEY}`;
 
 // DOM Elements
 const messageForm = document.getElementById('messageForm');
@@ -13,10 +12,6 @@ const clearChatButton = document.getElementById('clearChat');
 
 // Chat history for context
 let chatHistory = [];
-
-// Streaming control
-let streamController = null;
-let isStreaming = false;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -37,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Handle input changes
 function handleInputChange() {
     const hasText = messageInput.value.trim().length > 0;
-    sendButton.disabled = !hasText && !isStreaming;
+    sendButton.disabled = !hasText;
     
     // Update character counter
     updateCharacterCounter();
@@ -67,14 +62,11 @@ function updateCharacterCounter() {
 async function handleSubmit(e) {
     e.preventDefault();
     
-    // If streaming, stop it
-    if (isStreaming) {
-        stopGeneration();
-        return;
-    }
-    
     const message = messageInput.value.trim();
     if (!message) return;
+    
+    // Disable send button
+    sendButton.disabled = true;
     
     // Clear input
     messageInput.value = '';
@@ -86,35 +78,26 @@ async function handleSubmit(e) {
     // Show typing indicator
     showTypingIndicator();
     
-    // Change send button to stop button
-    updateSendButton(true);
-    
     try {
-        // Send to Gemini API with streaming
-        await sendToGeminiStreaming(message);
+        // Send to Gemini API
+        await sendToGemini(message);
         
     } catch (error) {
-        if (error.name !== 'AbortError') {
-            hideTypingIndicator();
-            console.error('Error:', error);
-            showError('Sorry, I encountered an error. Please try again.', message);
-        }
+        hideTypingIndicator();
+        console.error('Error:', error);
+        showError('Sorry, I encountered an error. Please try again.', message);
     } finally {
-        updateSendButton(false);
+        sendButton.disabled = false;
     }
     
     // Don't automatically refocus input to prevent keyboard from appearing
     // User can tap/click the input manually when ready
 }
 
-// Send message to Gemini API with streaming
-async function sendToGeminiStreaming(message) {
+// Send message to Gemini API
+async function sendToGemini(message) {
     try {
-        // Create abort controller for this request
-        streamController = new AbortController();
-        isStreaming = true;
-        
-        const response = await fetch(STREAM_API_URL, {
+        const response = await fetch(API_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -131,118 +114,38 @@ async function sendToGeminiStreaming(message) {
                     topP: 0.95,
                     maxOutputTokens: 2048,
                 }
-            }),
-            signal: streamController.signal
+            })
         });
 
         if (!response.ok) {
             throw new Error('API request failed');
         }
 
-        // Hide typing indicator and create AI message bubble
+        const data = await response.json();
+        
+        // Hide typing indicator
         hideTypingIndicator();
-        const aiMessageDiv = createAIMessageBubble();
-        const messageBubble = aiMessageDiv.querySelector('.message-bubble');
         
-        // Add streaming cursor
-        messageBubble.classList.add('streaming');
-        
-        let fullText = '';
-        let previousText = '';
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            
-            const chunk = decoder.decode(value);
-            const lines = chunk.split('\n');
-            
-            for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    try {
-                        const jsonStr = line.slice(6);
-                        const data = JSON.parse(jsonStr);
-                        
-                        if (data.candidates && data.candidates.length > 0) {
-                            const candidate = data.candidates[0];
-                            if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
-                                const newText = candidate.content.parts[0].text;
-                                
-                                // Only update if text has changed
-                                if (newText !== previousText) {
-                                    fullText = newText;
-                                    previousText = newText;
-                                    
-                                    // Update the message bubble with formatted text
-                                    messageBubble.innerHTML = formatAIResponse(fullText);
-                                    
-                                    // Auto-scroll to show new content
-                                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                                }
-                            }
-                        }
-                    } catch (e) {
-                        // Skip invalid JSON
-                    }
-                }
+        // Extract the AI response
+        if (data.candidates && data.candidates.length > 0) {
+            const candidate = data.candidates[0];
+            if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+                const aiResponse = candidate.content.parts[0].text;
+                addMessage(aiResponse, 'ai');
+            } else {
+                throw new Error('No response content');
             }
+        } else {
+            throw new Error('No candidates in response');
         }
-        
-        // Remove streaming cursor when done
-        messageBubble.classList.remove('streaming');
-        
-        // Add copy button to the message
-        addCopyButton(aiMessageDiv);
-        
-        // Add to chat history
-        const time = aiMessageDiv.querySelector('.message-time').textContent;
-        chatHistory.push({ role: 'ai', text: fullText, time: time });
         
     } catch (error) {
         console.error('Gemini API Error:', error);
         throw error;
-    } finally {
-        isStreaming = false;
-        streamController = null;
     }
 }
 
-// Create AI message bubble (for streaming)
-function createAIMessageBubble() {
-    // Remove welcome message if it exists
-    const welcomeMessage = messagesContainer.querySelector('.welcome-message');
-    if (welcomeMessage) {
-        welcomeMessage.remove();
-    }
-    
-    const messageDiv = document.createElement('div');
-    messageDiv.className = 'message ai';
-    
-    const time = new Date().toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit',
-        hour12: true 
-    });
-    
-    messageDiv.innerHTML = `
-        <div class="message-avatar">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
-            </svg>
-        </div>
-        <div class="message-content">
-            <div class="message-bubble"></div>
-            <div class="message-time">${time}</div>
-        </div>
-    `;
-    
-    messagesContainer.appendChild(messageDiv);
-    return messageDiv;
-}
-
-// Add message to chat (for user messages)
+// Add message to chat
 function addMessage(text, sender) {
     // Remove welcome message if it exists
     const welcomeMessage = messagesContainer.querySelector('.welcome-message');
@@ -271,12 +174,30 @@ function addMessage(text, sender) {
                 <div class="message-time">${time}</div>
             </div>
         `;
-        
-        messagesContainer.appendChild(messageDiv);
-        
-        // Add to chat history
-        chatHistory.push({ role: sender, text: text, time: time });
+    } else if (sender === 'ai') {
+        messageDiv.innerHTML = `
+            <div class="message-avatar">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+                </svg>
+            </div>
+            <div class="message-content">
+                <div class="message-bubble">${formatAIResponse(text)}</div>
+                <div class="message-time">${time}</div>
+            </div>
+        `;
     }
+    
+    messagesContainer.appendChild(messageDiv);
+    scrollToBottom();
+    
+    // Add copy button for AI messages
+    if (sender === 'ai') {
+        addCopyButton(messageDiv);
+    }
+    
+    // Add to chat history
+    chatHistory.push({ role: sender, text: text, time: time });
 }
 
 // Format AI response (convert markdown-like syntax to HTML)
@@ -385,47 +306,6 @@ messageInput.addEventListener('keydown', (e) => {
         }
     }
 });
-
-// Stop generation
-function stopGeneration() {
-    if (streamController) {
-        streamController.abort();
-        isStreaming = false;
-        hideTypingIndicator();
-        updateSendButton(false);
-        
-        // Add stopped message indicator
-        const lastMessage = messagesContainer.querySelector('.message.ai:last-of-type');
-        if (lastMessage) {
-            const bubble = lastMessage.querySelector('.message-bubble');
-            bubble.classList.remove('streaming');
-            bubble.innerHTML += '<em style="color: var(--text-secondary); display: block; margin-top: 8px; font-size: 12px;">Generation stopped</em>';
-            addCopyButton(lastMessage);
-        }
-    }
-}
-
-// Update send button appearance
-function updateSendButton(streaming) {
-    const sendButton = document.getElementById('sendButton');
-    if (streaming) {
-        sendButton.innerHTML = `
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="6" y="6" width="12" height="12" rx="1"/>
-            </svg>
-        `;
-        sendButton.title = 'Stop generation';
-        sendButton.disabled = false;
-    } else {
-        sendButton.innerHTML = `
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-            </svg>
-        `;
-        sendButton.title = 'Send message';
-        sendButton.disabled = !messageInput.value.trim();
-    }
-}
 
 // Add copy button to message
 function addCopyButton(messageDiv) {
