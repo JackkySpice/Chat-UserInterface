@@ -1,6 +1,6 @@
 # Gemini AI Chat Interface
 
-A beautiful, responsive chat interface styled like Facebook Messenger, powered by Google's Gemini 2.0 Flash AI model.
+A beautiful, responsive chat interface styled like Facebook Messenger, powered by Google's Gemini 2.5 Pro AI model.
 
 ## Features
 
@@ -18,7 +18,7 @@ A beautiful, responsive chat interface styled like Facebook Messenger, powered b
 - Landscape mode support
 
 🤖 **Gemini AI Integration**
-- Powered by Google's Gemini 2.0 Flash Experimental model
+- Powered by Google's Gemini 2.5 Pro model
 - Real-time AI responses
 - Typing indicators for better UX
 - Error handling and retry logic
@@ -64,8 +64,8 @@ No build process or dependencies required - just pure HTML, CSS, and vanilla Jav
 ## Technical Details
 
 ### API Configuration
-- **Model**: Gemini 2.0 Flash Experimental
-- **Endpoint**: `generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent`
+- **Model**: Gemini 2.5 Pro
+- **Endpoint**: `generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent`
 - **API Key**: AIzaSyD2Oxjw65jnQ_oDFG8sc6DbrdWghygr6Cg
 
 ### Responsive Breakpoints

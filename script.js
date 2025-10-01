@@ -1,6 +1,6 @@
 // Gemini API Configuration
 const API_KEY = 'AIzaSyD2Oxjw65jnQ_oDFG8sc6DbrdWghygr6Cg';
-const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${API_KEY}`;
+const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${API_KEY}`;
 
 // DOM Elements
 const messageForm = document.getElementById('messageForm');
@@ -235,7 +235,7 @@ function clearChat() {
                     </svg>
                 </div>
                 <h2>Welcome to Gemini Chat!</h2>
-                <p>I'm your AI assistant powered by Google's Gemini 2.0 Flash. Ask me anything!</p>
+                <p>I'm your AI assistant powered by Google's Gemini 2.5 Pro. Ask me anything!</p>
             </div>
         `;
     }
