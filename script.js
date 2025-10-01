@@ -20,6 +20,9 @@ let isStreaming = false;
 let userIsScrolling = false;
 let scrollTimeout = null;
 
+// Track if auto-scroll should be disabled
+let shouldAutoScroll = true;
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     messageForm.addEventListener('submit', handleSubmit);
@@ -34,6 +37,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Add suggestion click handlers
     initPromptSuggestions();
+    
+    // Load chat history from localStorage if available
+    loadChatHistory();
 });
 
 // Handle input changes
@@ -116,17 +122,38 @@ async function sendToGemini(message) {
         streamController = new AbortController();
         isStreaming = true;
         
+        // Build conversation history for context
+        const contents = [];
+        
+        // Add previous messages to context (limit to last 10 exchanges to avoid token limits)
+        const recentHistory = chatHistory.slice(-20); // Last 20 messages (10 exchanges)
+        recentHistory.forEach(msg => {
+            if (msg.role === 'user') {
+                contents.push({
+                    role: 'user',
+                    parts: [{ text: msg.text }]
+                });
+            } else if (msg.role === 'ai') {
+                contents.push({
+                    role: 'model',
+                    parts: [{ text: msg.text }]
+                });
+            }
+        });
+        
+        // Add current message
+        contents.push({
+            role: 'user',
+            parts: [{ text: message }]
+        });
+        
         const response = await fetch(API_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                contents: [{
-                    parts: [{
-                        text: message
-                    }]
-                }],
+                contents: contents,
                 generationConfig: {
                     temperature: 0.7,
                     topK: 40,
@@ -173,10 +200,11 @@ async function sendToGemini(message) {
         const time = aiMessageDiv.querySelector('.message-time').textContent;
         chatHistory.push({ role: 'ai', text: responseText, time: time });
         
-        // Only scroll to bottom if user hasn't manually scrolled up
-        if (!userIsScrolling) {
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
+        // Save to localStorage
+        saveChatHistory();
+        
+        // Auto-scroll to bottom only if user is already at bottom or hasn't scrolled up
+        scrollToBottomIfNeeded();
         
     } catch (error) {
         console.error('Gemini API Error:', error);
@@ -250,10 +278,16 @@ function addMessage(text, sender) {
             </div>
         `;
         
-        messagesContainer.appendChild(messageDiv);
-        
-        // Add to chat history
-        chatHistory.push({ role: sender, text: text, time: time });
+    messagesContainer.appendChild(messageDiv);
+    
+    // Add to chat history
+    chatHistory.push({ role: sender, text: text, time: time });
+    
+    // Save to localStorage
+    saveChatHistory();
+    
+    // Scroll to bottom when user sends a message
+    scrollToBottomIfNeeded();
     }
 }
 
@@ -299,10 +333,21 @@ function hideTypingIndicator() {
 // Scroll to bottom of messages
 function scrollToBottom() {
     setTimeout(() => {
-        if (!userIsScrolling) {
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }, 100);
+}
+
+// Smart scroll - only auto-scroll if user is near bottom
+function scrollToBottomIfNeeded() {
+    setTimeout(() => {
+        const isNearBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight < 150;
+        
+        // Only auto-scroll if user is already near the bottom
+        if (isNearBottom || !userIsScrolling) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            shouldAutoScroll = true;
+        }
+    }, 50);
 }
 
 // Show error message
@@ -333,6 +378,7 @@ function retryMessage(message) {
 function clearChat() {
     if (confirm('Are you sure you want to clear the chat?')) {
         chatHistory = [];
+        localStorage.removeItem('gemini_chat_history');
         messagesContainer.innerHTML = `
             <div class="welcome-message">
                 <div class="welcome-icon">
@@ -354,6 +400,83 @@ function clearChat() {
         // Re-initialize suggestion handlers
         initPromptSuggestions();
     }
+}
+
+// Save chat history to localStorage
+function saveChatHistory() {
+    try {
+        localStorage.setItem('gemini_chat_history', JSON.stringify(chatHistory));
+    } catch (e) {
+        console.error('Failed to save chat history:', e);
+    }
+}
+
+// Load chat history from localStorage
+function loadChatHistory() {
+    try {
+        const saved = localStorage.getItem('gemini_chat_history');
+        if (saved) {
+            chatHistory = JSON.parse(saved);
+            
+            // Remove welcome message if we have history
+            if (chatHistory.length > 0) {
+                const welcomeMessage = messagesContainer.querySelector('.welcome-message');
+                if (welcomeMessage) {
+                    welcomeMessage.remove();
+                }
+                
+                // Recreate all messages from history
+                chatHistory.forEach(msg => {
+                    recreateMessage(msg);
+                });
+                
+                // Scroll to bottom
+                setTimeout(() => {
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                }, 100);
+            }
+        }
+    } catch (e) {
+        console.error('Failed to load chat history:', e);
+    }
+}
+
+// Recreate a message from history
+function recreateMessage(msg) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${msg.role}`;
+    
+    if (msg.role === 'user') {
+        messageDiv.innerHTML = `
+            <div class="message-avatar">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                </svg>
+            </div>
+            <div class="message-content">
+                <div class="message-bubble">${escapeHtml(msg.text)}</div>
+                <div class="message-time">${msg.time}</div>
+            </div>
+        `;
+    } else if (msg.role === 'ai') {
+        messageDiv.innerHTML = `
+            <div class="message-avatar">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+                </svg>
+            </div>
+            <div class="message-content">
+                <div class="message-bubble">${formatAIResponse(msg.text)}</div>
+                <div class="message-time">${msg.time}</div>
+            </div>
+        `;
+        
+        messagesContainer.appendChild(messageDiv);
+        addCopyButton(messageDiv);
+        return;
+    }
+    
+    messagesContainer.appendChild(messageDiv);
 }
 
 // Handle Enter key to send message
@@ -460,30 +583,47 @@ function initScrollButton() {
     `;
     scrollBtn.onclick = () => {
         userIsScrolling = false; // Reset flag when user clicks scroll to bottom
+        shouldAutoScroll = true;
         messagesContainer.scrollTo({
             top: messagesContainer.scrollHeight,
             behavior: 'smooth'
         });
+        
+        // Hide the button immediately
+        setTimeout(() => {
+            scrollBtn.classList.remove('visible');
+        }, 300);
     };
     
     document.querySelector('.chat-container').appendChild(scrollBtn);
     
     // Show/hide based on scroll position and detect manual scrolling
+    let lastScrollTop = messagesContainer.scrollTop;
+    let isUserScrolling = false;
+    
     messagesContainer.addEventListener('scroll', () => {
         const isNearBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight < 100;
+        const currentScrollTop = messagesContainer.scrollTop;
+        
         scrollBtn.classList.toggle('visible', !isNearBottom && messagesContainer.scrollHeight > messagesContainer.clientHeight);
         
-        // Detect if user manually scrolled up
-        if (!isNearBottom) {
+        // Only track upward scrolling as user-initiated
+        if (currentScrollTop < lastScrollTop) {
+            isUserScrolling = true;
             userIsScrolling = true;
-        } else {
-            // Clear the flag when user scrolls back to bottom
+        }
+        
+        // Reset flag when near bottom
+        if (isNearBottom) {
             clearTimeout(scrollTimeout);
             scrollTimeout = setTimeout(() => {
                 userIsScrolling = false;
-            }, 150);
+                isUserScrolling = false;
+            }, 100);
         }
-    });
+        
+        lastScrollTop = currentScrollTop;
+    }, { passive: true });
 }
 
 // Initialize prompt suggestions
