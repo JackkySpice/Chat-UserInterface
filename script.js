@@ -122,17 +122,38 @@ async function sendToGemini(message) {
         streamController = new AbortController();
         isStreaming = true;
         
+        // Build conversation history for context
+        const contents = [];
+        
+        // Add previous messages to context (limit to last 10 exchanges to avoid token limits)
+        const recentHistory = chatHistory.slice(-20); // Last 20 messages (10 exchanges)
+        recentHistory.forEach(msg => {
+            if (msg.role === 'user') {
+                contents.push({
+                    role: 'user',
+                    parts: [{ text: msg.text }]
+                });
+            } else if (msg.role === 'ai') {
+                contents.push({
+                    role: 'model',
+                    parts: [{ text: msg.text }]
+                });
+            }
+        });
+        
+        // Add current message
+        contents.push({
+            role: 'user',
+            parts: [{ text: message }]
+        });
+        
         const response = await fetch(API_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                contents: [{
-                    parts: [{
-                        text: message
-                    }]
-                }],
+                contents: contents,
                 generationConfig: {
                     temperature: 0.7,
                     topK: 40,
