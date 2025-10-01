@@ -469,20 +469,27 @@ function initScrollButton() {
     document.querySelector('.chat-container').appendChild(scrollBtn);
     
     // Show/hide based on scroll position and detect manual scrolling
+    let lastScrollTop = messagesContainer.scrollTop;
+    
     messagesContainer.addEventListener('scroll', () => {
         const isNearBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight < 100;
+        const currentScrollTop = messagesContainer.scrollTop;
+        
         scrollBtn.classList.toggle('visible', !isNearBottom && messagesContainer.scrollHeight > messagesContainer.clientHeight);
         
-        // Detect if user manually scrolled up
-        if (!isNearBottom) {
+        // Detect if user manually scrolled (in any direction)
+        // Only set userIsScrolling flag if user scrolls UP
+        if (currentScrollTop < lastScrollTop && !isNearBottom) {
             userIsScrolling = true;
-        } else {
+        } else if (isNearBottom) {
             // Clear the flag when user scrolls back to bottom
             clearTimeout(scrollTimeout);
             scrollTimeout = setTimeout(() => {
                 userIsScrolling = false;
             }, 150);
         }
+        
+        lastScrollTop = currentScrollTop;
     });
 }
 
