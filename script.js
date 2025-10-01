@@ -14,10 +14,6 @@ const clearChatButton = document.getElementById('clearChat');
 // Chat history for context
 let chatHistory = [];
 
-// Streaming control
-let streamController = null;
-let isStreaming = false;
-
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     messageForm.addEventListener('submit', handleSubmit);
@@ -26,59 +22,24 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Focus input on load
     messageInput.focus();
-    
-    // Initialize scroll to bottom button
-    initScrollButton();
-    
-    // Add suggestion click handlers
-    initPromptSuggestions();
 });
 
 // Handle input changes
 function handleInputChange() {
     const hasText = messageInput.value.trim().length > 0;
-    sendButton.disabled = !hasText && !isStreaming;
-    
-    // Update character counter
-    updateCharacterCounter();
-}
-
-// Update character counter
-function updateCharacterCounter() {
-    const counter = document.getElementById('charCounter');
-    if (!counter) return;
-    
-    const length = messageInput.value.length;
-    const maxLength = 2000;
-    const remaining = maxLength - length;
-    
-    counter.textContent = `${remaining}`;
-    
-    if (remaining < 100) {
-        counter.style.color = '#c33';
-    } else if (remaining < 300) {
-        counter.style.color = '#f90';
-    } else {
-        counter.style.color = 'var(--text-secondary)';
-    }
+    sendButton.disabled = !hasText;
 }
 
 // Handle form submission
 async function handleSubmit(e) {
     e.preventDefault();
     
-    // If streaming, stop it
-    if (isStreaming) {
-        stopGeneration();
-        return;
-    }
-    
     const message = messageInput.value.trim();
     if (!message) return;
     
     // Clear input
     messageInput.value = '';
-    updateCharacterCounter();
+    sendButton.disabled = true;
     
     // Add user message to chat
     addMessage(message, 'user');
@@ -86,34 +47,23 @@ async function handleSubmit(e) {
     // Show typing indicator
     showTypingIndicator();
     
-    // Change send button to stop button
-    updateSendButton(true);
-    
     try {
         // Send to Gemini API with streaming
         await sendToGeminiStreaming(message);
         
     } catch (error) {
-        if (error.name !== 'AbortError') {
-            hideTypingIndicator();
-            console.error('Error:', error);
-            showError('Sorry, I encountered an error. Please try again.', message);
-        }
-    } finally {
-        updateSendButton(false);
+        hideTypingIndicator();
+        console.error('Error:', error);
+        showError('Sorry, I encountered an error. Please try again.');
     }
     
-    // Don't automatically refocus input to prevent keyboard from appearing
-    // User can tap/click the input manually when ready
+    // Refocus input
+    messageInput.focus();
 }
 
 // Send message to Gemini API with streaming
 async function sendToGeminiStreaming(message) {
     try {
-        // Create abort controller for this request
-        streamController = new AbortController();
-        isStreaming = true;
-        
         const response = await fetch(STREAM_API_URL, {
             method: 'POST',
             headers: {
@@ -131,8 +81,7 @@ async function sendToGeminiStreaming(message) {
                     topP: 0.95,
                     maxOutputTokens: 2048,
                 }
-            }),
-            signal: streamController.signal
+            })
         });
 
         if (!response.ok) {
@@ -148,7 +97,6 @@ async function sendToGeminiStreaming(message) {
         messageBubble.classList.add('streaming');
         
         let fullText = '';
-        let previousText = '';
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         
@@ -169,18 +117,10 @@ async function sendToGeminiStreaming(message) {
                             const candidate = data.candidates[0];
                             if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
                                 const newText = candidate.content.parts[0].text;
+                                fullText = newText;
                                 
-                                // Only update if text has changed
-                                if (newText !== previousText) {
-                                    fullText = newText;
-                                    previousText = newText;
-                                    
-                                    // Update the message bubble with formatted text
-                                    messageBubble.innerHTML = formatAIResponse(fullText);
-                                    
-                                    // Auto-scroll to show new content
-                                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                                }
+                                // Update the message bubble with formatted text
+                                messageBubble.innerHTML = formatAIResponse(fullText);
                             }
                         }
                     } catch (e) {
@@ -193,9 +133,6 @@ async function sendToGeminiStreaming(message) {
         // Remove streaming cursor when done
         messageBubble.classList.remove('streaming');
         
-        // Add copy button to the message
-        addCopyButton(aiMessageDiv);
-        
         // Add to chat history
         const time = aiMessageDiv.querySelector('.message-time').textContent;
         chatHistory.push({ role: 'ai', text: fullText, time: time });
@@ -203,9 +140,6 @@ async function sendToGeminiStreaming(message) {
     } catch (error) {
         console.error('Gemini API Error:', error);
         throw error;
-    } finally {
-        isStreaming = false;
-        streamController = null;
     }
 }
 
@@ -326,27 +260,16 @@ function scrollToBottom() {
 }
 
 // Show error message
-function showError(message, originalMessage = null) {
+function showError(message) {
     const errorDiv = document.createElement('div');
     errorDiv.className = 'error-message';
-    errorDiv.innerHTML = `
-        <span>${message}</span>
-        ${originalMessage ? `<button class="retry-button" onclick="retryMessage('${escapeHtml(originalMessage).replace(/'/g, "\\'")}')">Retry</button>` : ''}
-    `;
+    errorDiv.textContent = message;
     messagesContainer.appendChild(errorDiv);
-    scrollToBottom();
     
-    // Remove error after 8 seconds
+    // Remove error after 5 seconds
     setTimeout(() => {
         errorDiv.remove();
-    }, 8000);
-}
-
-// Retry failed message
-function retryMessage(message) {
-    messageInput.value = message;
-    handleInputChange();
-    messageInput.focus();
+    }, 5000);
 }
 
 // Clear chat
@@ -362,17 +285,8 @@ function clearChat() {
                 </div>
                 <h2>Welcome to Gemini Chat!</h2>
                 <p>I'm your AI assistant powered by Google's Gemini 2.5 Pro. Ask me anything!</p>
-                
-                <div class="suggestions-container">
-                    <button class="suggestion-chip">Explain quantum computing</button>
-                    <button class="suggestion-chip">Write a Python function</button>
-                    <button class="suggestion-chip">Plan a trip to Japan</button>
-                    <button class="suggestion-chip">Help me debug code</button>
-                </div>
             </div>
         `;
-        // Re-initialize suggestion handlers
-        initPromptSuggestions();
     }
 }
 
@@ -385,126 +299,6 @@ messageInput.addEventListener('keydown', (e) => {
         }
     }
 });
-
-// Stop generation
-function stopGeneration() {
-    if (streamController) {
-        streamController.abort();
-        isStreaming = false;
-        hideTypingIndicator();
-        updateSendButton(false);
-        
-        // Add stopped message indicator
-        const lastMessage = messagesContainer.querySelector('.message.ai:last-of-type');
-        if (lastMessage) {
-            const bubble = lastMessage.querySelector('.message-bubble');
-            bubble.classList.remove('streaming');
-            bubble.innerHTML += '<em style="color: var(--text-secondary); display: block; margin-top: 8px; font-size: 12px;">Generation stopped</em>';
-            addCopyButton(lastMessage);
-        }
-    }
-}
-
-// Update send button appearance
-function updateSendButton(streaming) {
-    const sendButton = document.getElementById('sendButton');
-    if (streaming) {
-        sendButton.innerHTML = `
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="6" y="6" width="12" height="12" rx="1"/>
-            </svg>
-        `;
-        sendButton.title = 'Stop generation';
-        sendButton.disabled = false;
-    } else {
-        sendButton.innerHTML = `
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-            </svg>
-        `;
-        sendButton.title = 'Send message';
-        sendButton.disabled = !messageInput.value.trim();
-    }
-}
-
-// Add copy button to message
-function addCopyButton(messageDiv) {
-    const messageContent = messageDiv.querySelector('.message-content');
-    const bubble = messageDiv.querySelector('.message-bubble');
-    
-    // Don't add if already exists
-    if (messageContent.querySelector('.copy-button')) return;
-    
-    const copyBtn = document.createElement('button');
-    copyBtn.className = 'copy-button';
-    copyBtn.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
-        </svg>
-    `;
-    copyBtn.title = 'Copy message';
-    copyBtn.onclick = () => copyToClipboard(bubble.textContent, copyBtn);
-    
-    messageContent.appendChild(copyBtn);
-}
-
-// Copy to clipboard
-function copyToClipboard(text, button) {
-    navigator.clipboard.writeText(text).then(() => {
-        const originalHTML = button.innerHTML;
-        button.innerHTML = `
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-            </svg>
-        `;
-        button.style.color = '#31a24c';
-        
-        setTimeout(() => {
-            button.innerHTML = originalHTML;
-            button.style.color = '';
-        }, 2000);
-    }).catch(err => {
-        console.error('Failed to copy:', err);
-    });
-}
-
-// Initialize scroll to bottom button
-function initScrollButton() {
-    const scrollBtn = document.createElement('button');
-    scrollBtn.id = 'scrollToBottomBtn';
-    scrollBtn.className = 'scroll-to-bottom';
-    scrollBtn.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
-        </svg>
-    `;
-    scrollBtn.onclick = () => {
-        messagesContainer.scrollTo({
-            top: messagesContainer.scrollHeight,
-            behavior: 'smooth'
-        });
-    };
-    
-    document.querySelector('.chat-container').appendChild(scrollBtn);
-    
-    // Show/hide based on scroll position
-    messagesContainer.addEventListener('scroll', () => {
-        const isNearBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight < 100;
-        scrollBtn.classList.toggle('visible', !isNearBottom && messagesContainer.scrollHeight > messagesContainer.clientHeight);
-    });
-}
-
-// Initialize prompt suggestions
-function initPromptSuggestions() {
-    const suggestions = document.querySelectorAll('.suggestion-chip');
-    suggestions.forEach(chip => {
-        chip.addEventListener('click', () => {
-            messageInput.value = chip.textContent;
-            handleInputChange();
-            messageInput.focus();
-        });
-    });
-}
 
 // Prevent zoom on iOS when focusing input
 if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
