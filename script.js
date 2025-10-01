@@ -57,8 +57,8 @@ async function handleSubmit(e) {
         showError('Sorry, I encountered an error. Please try again.');
     }
     
-    // Refocus input
-    messageInput.focus();
+    // Don't automatically refocus input to prevent keyboard from appearing
+    // User can tap/click the input manually when ready
 }
 
 // Send message to Gemini API with streaming
@@ -97,6 +97,7 @@ async function sendToGeminiStreaming(message) {
         messageBubble.classList.add('streaming');
         
         let fullText = '';
+        let previousText = '';
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         
@@ -117,10 +118,18 @@ async function sendToGeminiStreaming(message) {
                             const candidate = data.candidates[0];
                             if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
                                 const newText = candidate.content.parts[0].text;
-                                fullText = newText;
                                 
-                                // Update the message bubble with formatted text
-                                messageBubble.innerHTML = formatAIResponse(fullText);
+                                // Only update if text has changed
+                                if (newText !== previousText) {
+                                    fullText = newText;
+                                    previousText = newText;
+                                    
+                                    // Update the message bubble with formatted text
+                                    messageBubble.innerHTML = formatAIResponse(fullText);
+                                    
+                                    // Auto-scroll to show new content
+                                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                                }
                             }
                         }
                     } catch (e) {
