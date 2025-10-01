@@ -206,6 +206,11 @@ async function sendToGemini(message) {
         // Auto-scroll to bottom only if user is already at bottom or hasn't scrolled up
         scrollToBottomIfNeeded();
         
+        // Update scroll indicators
+        if (window.updateScrollIndicators) {
+            setTimeout(window.updateScrollIndicators, 100);
+        }
+        
     } catch (error) {
         console.error('Gemini API Error:', error);
         throw error;
@@ -288,6 +293,11 @@ function addMessage(text, sender) {
     
     // Scroll to bottom when user sends a message
     scrollToBottomIfNeeded();
+    
+    // Update scroll indicators
+    if (window.updateScrollIndicators) {
+        setTimeout(window.updateScrollIndicators, 100);
+    }
     }
 }
 
@@ -433,6 +443,10 @@ function loadChatHistory() {
                 // Scroll to bottom
                 setTimeout(() => {
                     messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                    // Update scroll indicators
+                    if (window.updateScrollIndicators) {
+                        updateScrollIndicators();
+                    }
                 }, 100);
             }
         }
@@ -607,6 +621,9 @@ function initScrollButton() {
         
         scrollBtn.classList.toggle('visible', !isNearBottom && messagesContainer.scrollHeight > messagesContainer.clientHeight);
         
+        // Show scroll indicator when scrolled from top
+        messagesContainer.classList.toggle('has-scroll', currentScrollTop > 20);
+        
         // Only track upward scrolling as user-initiated
         if (currentScrollTop < lastScrollTop) {
             isUserScrolling = true;
@@ -624,6 +641,19 @@ function initScrollButton() {
         
         lastScrollTop = currentScrollTop;
     }, { passive: true });
+    
+    // Check scroll state on load and after messages are added
+    function updateScrollIndicators() {
+        const isScrollable = messagesContainer.scrollHeight > messagesContainer.clientHeight;
+        const isNearBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight < 100;
+        const isScrolledFromTop = messagesContainer.scrollTop > 20;
+        
+        scrollBtn.classList.toggle('visible', !isNearBottom && isScrollable);
+        messagesContainer.classList.toggle('has-scroll', isScrolledFromTop);
+    }
+    
+    // Expose function for use elsewhere
+    window.updateScrollIndicators = updateScrollIndicators;
 }
 
 // Initialize prompt suggestions

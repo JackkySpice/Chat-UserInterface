@@ -13,16 +13,25 @@
 - **Backread Support**: Scroll up to read previous messages without any interference
 - **Smart Auto-Scroll**: New messages only auto-scroll if you're already near the bottom
 - **Manual Scroll Detection**: If you scroll up to read old messages, new messages won't force you to the bottom
+- **Smooth Scrolling**: Native smooth scroll behavior for better UX
 
-### 3. **Scroll-to-Bottom Button**
+### 3. **Visual Scroll Indicators**
+- **Enhanced Scrollbar**: More visible scrollbar (8px width) with hover effects
+- **Scroll Gradient**: Subtle gradient appears at top when scrolled down
+- **Scroll-to-Bottom Button**: Floating button appears when not at bottom
+- **Active State Feedback**: Visual feedback when scrolling
+
+### 4. **Scroll-to-Bottom Button**
 - Appears when you scroll up away from the bottom
 - Click to quickly jump back to the latest messages
 - Auto-hides when you're at the bottom
+- Smooth scroll animation
 
-### 4. **Touch-Optimized**
+### 5. **Touch-Optimized**
 - Smooth touch scrolling on mobile devices
 - Proper momentum scrolling with `-webkit-overflow-scrolling: touch`
 - Touch gestures work naturally for scrolling
+- Optimized for iOS and Android devices
 
 ## How It Works
 
@@ -55,14 +64,27 @@
 ## Technical Details
 
 **CSS Changes:**
-- Removed `overflow: hidden` from message elements
-- Added `overflow-y: scroll !important` to messages container
+- Changed `overflow-y` from `scroll !important` to `auto` for better behavior
+- Added `scroll-behavior: smooth` for smooth scrolling
+- Added `min-height: 0` to fix flexbox scrolling issues
+- Enhanced scrollbar visibility (8px width, visible track)
+- Added gradient indicator for scrollable content
+- Changed `overscroll-behavior-y` to `contain` for better mobile UX
 - Added `touch-action: pan-y` for better touch support
-- Optimized scrollbar styling
 
 **JavaScript Features:**
-- Smart scroll detection (tracks scroll direction)
-- localStorage integration for persistence
-- Message recreation from history
-- Auto-scroll only when user is at bottom
+- Smart scroll detection (tracks scroll direction and position)
+- localStorage integration for persistence across sessions
+- Message recreation from history on page load
+- Auto-scroll only when user is at bottom (doesn't interrupt reading)
 - Passive event listeners for better performance
+- Dynamic scroll indicator updates
+- Context memory: Last 20 messages (10 exchanges) sent to AI for context
+- Maintains full conversation context in localStorage
+
+**AI Context Management:**
+- Stores complete chat history in localStorage
+- Sends last 20 messages to Gemini API as context
+- Allows AI to remember previous conversation
+- Persists across browser sessions
+- Clear chat removes both UI and stored history
