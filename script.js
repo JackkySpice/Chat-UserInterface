@@ -90,8 +90,8 @@ async function handleSubmit(e) {
     updateSendButton(true);
     
     try {
-        // Send to Gemini API with streaming
-        await sendToGeminiStreaming(message);
+        // Send to Gemini API (non-streaming for instant complete response)
+        await sendToGemini(message);
         
     } catch (error) {
         if (error.name !== 'AbortError') {
@@ -107,14 +107,14 @@ async function handleSubmit(e) {
     // User can tap/click the input manually when ready
 }
 
-// Send message to Gemini API with streaming
-async function sendToGeminiStreaming(message) {
+// Send message to Gemini API (non-streaming - shows complete response instantly)
+async function sendToGemini(message) {
     try {
         // Create abort controller for this request
         streamController = new AbortController();
         isStreaming = true;
         
-        const response = await fetch(STREAM_API_URL, {
+        const response = await fetch(API_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -139,66 +139,40 @@ async function sendToGeminiStreaming(message) {
             throw new Error('API request failed');
         }
 
-        // Hide typing indicator and create AI message bubble
+        const data = await response.json();
+        
+        // Hide typing indicator
         hideTypingIndicator();
-        const aiMessageDiv = createAIMessageBubble();
-        const messageBubble = aiMessageDiv.querySelector('.message-bubble');
         
-        // Add streaming cursor
-        messageBubble.classList.add('streaming');
-        
-        let fullText = '';
-        let previousText = '';
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            
-            const chunk = decoder.decode(value);
-            const lines = chunk.split('\n');
-            
-            for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    try {
-                        const jsonStr = line.slice(6);
-                        const data = JSON.parse(jsonStr);
-                        
-                        if (data.candidates && data.candidates.length > 0) {
-                            const candidate = data.candidates[0];
-                            if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
-                                const newText = candidate.content.parts[0].text;
-                                
-                                // Only update if text has changed
-                                if (newText !== previousText) {
-                                    fullText = newText;
-                                    previousText = newText;
-                                    
-                                    // Update the message bubble with formatted text
-                                    messageBubble.innerHTML = formatAIResponse(fullText);
-                                    
-                                    // Auto-scroll to show new content
-                                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                                }
-                            }
-                        }
-                    } catch (e) {
-                        // Skip invalid JSON
-                    }
-                }
+        // Extract the response text
+        let responseText = '';
+        if (data.candidates && data.candidates.length > 0) {
+            const candidate = data.candidates[0];
+            if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+                responseText = candidate.content.parts[0].text;
             }
         }
         
-        // Remove streaming cursor when done
-        messageBubble.classList.remove('streaming');
+        if (!responseText) {
+            throw new Error('No response from API');
+        }
+        
+        // Create and display AI message bubble with complete response
+        const aiMessageDiv = createAIMessageBubble();
+        const messageBubble = aiMessageDiv.querySelector('.message-bubble');
+        
+        // Display the complete formatted response instantly
+        messageBubble.innerHTML = formatAIResponse(responseText);
         
         // Add copy button to the message
         addCopyButton(aiMessageDiv);
         
         // Add to chat history
         const time = aiMessageDiv.querySelector('.message-time').textContent;
-        chatHistory.push({ role: 'ai', text: fullText, time: time });
+        chatHistory.push({ role: 'ai', text: responseText, time: time });
+        
+        // Scroll to show the complete message
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
         
     } catch (error) {
         console.error('Gemini API Error:', error);
