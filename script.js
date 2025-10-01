@@ -1,6 +1,7 @@
 // Gemini API Configuration
 const API_KEY = 'AIzaSyD2Oxjw65jnQ_oDFG8sc6DbrdWghygr6Cg';
 const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${API_KEY}`;
+const STREAM_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=sse&key=${API_KEY}`;
 
 // DOM Elements
 const messageForm = document.getElementById('messageForm');
@@ -47,14 +48,8 @@ async function handleSubmit(e) {
     showTypingIndicator();
     
     try {
-        // Send to Gemini API
-        const response = await sendToGemini(message);
-        
-        // Hide typing indicator
-        hideTypingIndicator();
-        
-        // Add AI response to chat
-        addMessage(response, 'ai');
+        // Send to Gemini API with streaming
+        await sendToGeminiStreaming(message);
         
     } catch (error) {
         hideTypingIndicator();
@@ -66,10 +61,10 @@ async function handleSubmit(e) {
     messageInput.focus();
 }
 
-// Send message to Gemini API
-async function sendToGemini(message) {
+// Send message to Gemini API with streaming
+async function sendToGeminiStreaming(message) {
     try {
-        const response = await fetch(API_URL, {
+        const response = await fetch(STREAM_API_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -90,21 +85,57 @@ async function sendToGemini(message) {
         });
 
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error?.message || 'API request failed');
+            throw new Error('API request failed');
         }
 
-        const data = await response.json();
+        // Hide typing indicator and create AI message bubble
+        hideTypingIndicator();
+        const aiMessageDiv = createAIMessageBubble();
+        const messageBubble = aiMessageDiv.querySelector('.message-bubble');
         
-        // Extract the text from the response
-        if (data.candidates && data.candidates.length > 0) {
-            const candidate = data.candidates[0];
-            if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
-                return candidate.content.parts[0].text;
+        // Add streaming cursor
+        messageBubble.classList.add('streaming');
+        
+        let fullText = '';
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+            
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    try {
+                        const jsonStr = line.slice(6);
+                        const data = JSON.parse(jsonStr);
+                        
+                        if (data.candidates && data.candidates.length > 0) {
+                            const candidate = data.candidates[0];
+                            if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+                                const newText = candidate.content.parts[0].text;
+                                fullText = newText;
+                                
+                                // Update the message bubble with formatted text
+                                messageBubble.innerHTML = formatAIResponse(fullText);
+                            }
+                        }
+                    } catch (e) {
+                        // Skip invalid JSON
+                    }
+                }
             }
         }
         
-        throw new Error('Invalid response format from API');
+        // Remove streaming cursor when done
+        messageBubble.classList.remove('streaming');
+        
+        // Add to chat history
+        const time = aiMessageDiv.querySelector('.message-time').textContent;
+        chatHistory.push({ role: 'ai', text: fullText, time: time });
         
     } catch (error) {
         console.error('Gemini API Error:', error);
@@ -112,7 +143,40 @@ async function sendToGemini(message) {
     }
 }
 
-// Add message to chat
+// Create AI message bubble (for streaming)
+function createAIMessageBubble() {
+    // Remove welcome message if it exists
+    const welcomeMessage = messagesContainer.querySelector('.welcome-message');
+    if (welcomeMessage) {
+        welcomeMessage.remove();
+    }
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message ai';
+    
+    const time = new Date().toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+    });
+    
+    messageDiv.innerHTML = `
+        <div class="message-avatar">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+            </svg>
+        </div>
+        <div class="message-content">
+            <div class="message-bubble"></div>
+            <div class="message-time">${time}</div>
+        </div>
+    `;
+    
+    messagesContainer.appendChild(messageDiv);
+    return messageDiv;
+}
+
+// Add message to chat (for user messages)
 function addMessage(text, sender) {
     // Remove welcome message if it exists
     const welcomeMessage = messagesContainer.querySelector('.welcome-message');
@@ -141,24 +205,12 @@ function addMessage(text, sender) {
                 <div class="message-time">${time}</div>
             </div>
         `;
-    } else {
-        messageDiv.innerHTML = `
-            <div class="message-avatar">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
-                </svg>
-            </div>
-            <div class="message-content">
-                <div class="message-bubble">${formatAIResponse(text)}</div>
-                <div class="message-time">${time}</div>
-            </div>
-        `;
+        
+        messagesContainer.appendChild(messageDiv);
+        
+        // Add to chat history
+        chatHistory.push({ role: sender, text: text, time: time });
     }
-    
-    messagesContainer.appendChild(messageDiv);
-    
-    // Add to chat history
-    chatHistory.push({ role: sender, text: text, time: time });
 }
 
 // Format AI response (convert markdown-like syntax to HTML)
