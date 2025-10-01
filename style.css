@@ -159,6 +159,9 @@ body {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .messages-container::-webkit-scrollbar {
@@ -224,6 +227,8 @@ body {
     gap: 8px;
     justify-content: center;
     margin-top: 20px;
+    max-width: 100%;
+    overflow: hidden;
 }
 
 .suggestion-chip {
@@ -252,10 +257,12 @@ body {
     align-items: flex-end;
     gap: 8px;
     max-width: 100%;
+    width: 100%;
     animation: fadeInUp 0.3s ease;
     word-wrap: break-word;
     overflow-wrap: break-word;
-    width: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
 }
 
 @keyframes fadeInUp {
@@ -299,9 +306,12 @@ body {
 
 .message-content {
     max-width: 70%;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 4px;
+    overflow: hidden;
+    box-sizing: border-box;
 }
 
 .message-bubble {
@@ -314,8 +324,11 @@ body {
     word-break: break-word;
     hyphens: auto;
     max-width: 100%;
+    width: 100%;
     overflow: hidden;
+    overflow-x: hidden;
     white-space: pre-wrap;
+    box-sizing: border-box;
 }
 
 .message.user .message-bubble {
@@ -502,16 +515,42 @@ body {
     overflow-x: auto;
     margin: 4px 0;
     max-width: 100%;
+    white-space: pre-wrap;
+    word-wrap: break-word;
 }
 
 .message-bubble code {
     font-family: 'Courier New', Courier, monospace;
     font-size: 13px;
     word-break: break-all;
+    white-space: pre-wrap;
 }
 
 .message-bubble pre code {
     word-break: normal;
+    white-space: pre-wrap;
+}
+
+.message-bubble strong,
+.message-bubble em,
+.message-bubble br,
+.message-bubble a,
+.message-bubble span,
+.message-bubble div {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+/* Handle very long words and URLs */
+.message-bubble {
+    overflow-wrap: anywhere;
+}
+
+/* Ensure inline elements don't cause overflow */
+.message-bubble * {
+    max-width: 100%;
+    overflow-wrap: break-word;
 }
 
 /* Streaming cursor effect */
@@ -651,6 +690,7 @@ body {
 
     .message-content {
         max-width: 80%;
+        min-width: 0;
     }
 
     .welcome-message {
@@ -697,6 +737,7 @@ body {
 
     .message-content {
         max-width: 85%;
+        min-width: 0;
     }
 
     .avatar {
@@ -766,10 +807,16 @@ html, body {
     overflow-x: hidden;
     width: 100%;
     max-width: 100vw;
+    position: relative;
 }
 
 .chat-container {
     overflow-x: hidden;
     width: 100%;
     max-width: 100%;
+    box-sizing: border-box;
+}
+
+.chat-container * {
+    box-sizing: border-box;
 }
