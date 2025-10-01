@@ -17,6 +17,8 @@ let chatHistory = [];
 // Streaming control
 let streamController = null;
 let isStreaming = false;
+let userIsScrolling = false;
+let scrollTimeout = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -171,8 +173,10 @@ async function sendToGemini(message) {
         const time = aiMessageDiv.querySelector('.message-time').textContent;
         chatHistory.push({ role: 'ai', text: responseText, time: time });
         
-        // Scroll to show the complete message
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        // Only scroll to bottom if user hasn't manually scrolled up
+        if (!userIsScrolling) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
         
     } catch (error) {
         console.error('Gemini API Error:', error);
@@ -295,7 +299,9 @@ function hideTypingIndicator() {
 // Scroll to bottom of messages
 function scrollToBottom() {
     setTimeout(() => {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        if (!userIsScrolling) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
     }, 100);
 }
 
@@ -453,6 +459,7 @@ function initScrollButton() {
         </svg>
     `;
     scrollBtn.onclick = () => {
+        userIsScrolling = false; // Reset flag when user clicks scroll to bottom
         messagesContainer.scrollTo({
             top: messagesContainer.scrollHeight,
             behavior: 'smooth'
@@ -461,10 +468,21 @@ function initScrollButton() {
     
     document.querySelector('.chat-container').appendChild(scrollBtn);
     
-    // Show/hide based on scroll position
+    // Show/hide based on scroll position and detect manual scrolling
     messagesContainer.addEventListener('scroll', () => {
         const isNearBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight < 100;
         scrollBtn.classList.toggle('visible', !isNearBottom && messagesContainer.scrollHeight > messagesContainer.clientHeight);
+        
+        // Detect if user manually scrolled up
+        if (!isNearBottom) {
+            userIsScrolling = true;
+        } else {
+            // Clear the flag when user scrolls back to bottom
+            clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(() => {
+                userIsScrolling = false;
+            }, 150);
+        }
     });
 }
 
