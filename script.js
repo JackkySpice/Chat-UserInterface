@@ -470,6 +470,7 @@ function initScrollButton() {
     
     // Show/hide based on scroll position and detect manual scrolling
     let lastScrollTop = messagesContainer.scrollTop;
+    let isUserScrolling = false;
     
     messagesContainer.addEventListener('scroll', () => {
         const isNearBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight < 100;
@@ -477,20 +478,23 @@ function initScrollButton() {
         
         scrollBtn.classList.toggle('visible', !isNearBottom && messagesContainer.scrollHeight > messagesContainer.clientHeight);
         
-        // Detect if user manually scrolled (in any direction)
-        // Only set userIsScrolling flag if user scrolls UP
-        if (currentScrollTop < lastScrollTop && !isNearBottom) {
+        // Only track upward scrolling as user-initiated
+        if (currentScrollTop < lastScrollTop) {
+            isUserScrolling = true;
             userIsScrolling = true;
-        } else if (isNearBottom) {
-            // Clear the flag when user scrolls back to bottom
+        }
+        
+        // Reset flag when near bottom
+        if (isNearBottom) {
             clearTimeout(scrollTimeout);
             scrollTimeout = setTimeout(() => {
                 userIsScrolling = false;
-            }, 150);
+                isUserScrolling = false;
+            }, 100);
         }
         
         lastScrollTop = currentScrollTop;
-    });
+    }, { passive: true });
 }
 
 // Initialize prompt suggestions

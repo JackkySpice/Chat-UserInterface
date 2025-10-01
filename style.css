@@ -152,7 +152,7 @@ body {
 /* Messages Area */
 .messages-container {
     flex: 1;
-    overflow-y: auto;
+    overflow-y: scroll !important;
     overflow-x: hidden;
     padding: 16px;
     background: var(--bg-main);
@@ -163,9 +163,9 @@ body {
     max-width: 100%;
     box-sizing: border-box;
     -webkit-overflow-scrolling: touch;
-    overscroll-behavior-y: contain;
-    scroll-behavior: smooth;
+    overscroll-behavior-y: auto;
     position: relative;
+    touch-action: pan-y;
 }
 
 .messages-container::-webkit-scrollbar {
@@ -265,7 +265,6 @@ body {
     animation: fadeInUp 0.3s ease;
     word-wrap: break-word;
     overflow-wrap: break-word;
-    overflow: hidden;
     box-sizing: border-box;
 }
 
@@ -314,7 +313,6 @@ body {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    overflow: hidden;
     box-sizing: border-box;
 }
 
@@ -329,8 +327,7 @@ body {
     hyphens: auto;
     max-width: 100%;
     width: 100%;
-    overflow: hidden;
-    overflow-x: hidden;
+    overflow-x: auto;
     white-space: pre-wrap;
     box-sizing: border-box;
 }
