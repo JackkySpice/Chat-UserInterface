@@ -159,7 +159,6 @@ body {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    scroll-behavior: smooth;
 }
 
 .messages-container::-webkit-scrollbar {
@@ -226,6 +225,7 @@ body {
     animation: fadeInUp 0.3s ease;
     word-wrap: break-word;
     overflow-wrap: break-word;
+    width: 100%;
 }
 
 @keyframes fadeInUp {
@@ -281,8 +281,11 @@ body {
     line-height: 1.4;
     word-wrap: break-word;
     overflow-wrap: break-word;
+    word-break: break-word;
     hyphens: auto;
     max-width: 100%;
+    overflow: hidden;
+    white-space: pre-wrap;
 }
 
 .message.user .message-bubble {
@@ -449,6 +452,26 @@ body {
 .send-button svg {
     width: 20px;
     height: 20px;
+}
+
+/* Code blocks in messages */
+.message-bubble pre {
+    background: rgba(0, 0, 0, 0.05);
+    padding: 8px;
+    border-radius: 4px;
+    overflow-x: auto;
+    margin: 4px 0;
+    max-width: 100%;
+}
+
+.message-bubble code {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    word-break: break-all;
+}
+
+.message-bubble pre code {
+    word-break: normal;
 }
 
 /* Error Message */

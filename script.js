@@ -156,7 +156,6 @@ function addMessage(text, sender) {
     }
     
     messagesContainer.appendChild(messageDiv);
-    scrollToBottom();
     
     // Add to chat history
     chatHistory.push({ role: sender, text: text, time: time });
@@ -194,7 +193,6 @@ function escapeHtml(text) {
 // Show typing indicator
 function showTypingIndicator() {
     typingIndicator.classList.add('active');
-    scrollToBottom();
 }
 
 // Hide typing indicator
@@ -215,7 +213,6 @@ function showError(message) {
     errorDiv.className = 'error-message';
     errorDiv.textContent = message;
     messagesContainer.appendChild(errorDiv);
-    scrollToBottom();
     
     // Remove error after 5 seconds
     setTimeout(() => {
